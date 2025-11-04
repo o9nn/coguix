@@ -1,0 +1,121 @@
+#!/usr/bin/env guile
+!#
+
+;;; Guix AI Assistant - Command Line Interface
+;;; Copyright © 2025 Manus AI
+
+(use-modules (guix ai-assistant)
+             (ice-9 format)
+             (ice-9 match)
+             (ice-9 readline))
+
+(define (print-banner)
+  "Display the AI Assistant banner."
+  (format #t "~%")
+  (format #t "    ╔═══════════════════════════════════════════════════════╗~%")
+  (format #t "    ║                                                       ║~%")
+  (format #t "    ║       🤖  GUIX AI ASSISTANT  🤖                      ║~%")
+  (format #t "    ║                                                       ║~%")
+  (format #t "    ║   Revolutionary AI-Powered Package Management        ║~%")
+  (format #t "    ║                                                       ║~%")
+  (format #t "    ║   \"Nobody believed it was possible...\"                ║~%")
+  (format #t "    ║   \"...until now.\"                                     ║~%")
+  (format #t "    ║                                                       ║~%")
+  (format #t "    ╚═══════════════════════════════════════════════════════╝~%")
+  (format #t "~%"))
+
+(define (print-help)
+  "Display help information."
+  (format #t "~%Guix AI Assistant - Usage~%")
+  (format #t "═══════════════════════════════════════~%~%")
+  (format #t "Commands:~%~%")
+  (format #t "  guix ai suggest \"web browser\"~%")
+  (format #t "    → Find packages matching your description~%~%")
+  (format #t "  guix ai fix python-package \"error message\"~%")
+  (format #t "    → Get AI-powered help fixing build errors~%~%")
+  (format #t "  guix ai optimize emacs~%")
+  (format #t "    → Optimize package build configuration~%~%")
+  (format #t "  guix ai deps new-package~%")
+  (format #t "    → Intelligently discover dependencies~%~%")
+  (format #t "  guix ai generate myapp 1.0.0 https://example.com/myapp.tar.gz~%")
+  (format #t "    → Generate complete package definition~%~%")
+  (format #t "  guix ai health python~%")
+  (format #t "    → Analyze package health and quality~%~%")
+  (format #t "  guix ai updates~%")
+  (format #t "    → Get AI recommendations for package updates~%~%")
+  (format #t "  guix ai explain build.log~%")
+  (format #t "    → Explain build failures in plain English~%~%")
+  (format #t "  guix ai interactive~%")
+  (format #t "    → Start interactive AI assistant session~%~%")
+  (format #t "Examples:~%~%")
+  (format #t "  # Find a package~%")
+  (format #t "  $ guix ai suggest \"video editor with effects\"~%~%")
+  (format #t "  # Fix a build error~%")
+  (format #t "  $ guix ai fix python-numpy \"ImportError: libopenblas.so\"~%~%")
+  (format #t "  # Generate a new package~%")
+  (format #t "  $ guix ai generate hello 2.12 https://ftp.gnu.org/gnu/hello/hello-2.12.tar.gz~%~%")
+  (format #t "Features:~%~%")
+  (format #t "  ✨ Natural language package search~%")
+  (format #t "  🔧 Intelligent build error diagnosis~%")
+  (format #t "  ⚡ Automated build optimization~%")
+  (format #t "  🔍 Smart dependency discovery~%")
+  (format #t "  📝 Automatic package generation~%")
+  (format #t "  🏥 Package health analysis~%")
+  (format #t "  🔄 Update recommendations~%")
+  (format #t "  💬 Plain English explanations~%~%")
+  (format #t "For more information: guix ai help~%~%"))
+
+(define (main args)
+  "Main entry point for the AI assistant CLI."
+  (match args
+    ((_ "suggest" description)
+     (print-banner)
+     (ai-suggest-package description))
+    
+    ((_ "fix" package-name error)
+     (print-banner)
+     (ai-fix-package package-name error))
+    
+    ((_ "optimize" package-name)
+     (print-banner)
+     (ai-optimize-build package-name))
+    
+    ((_ "deps" package-name)
+     (print-banner)
+     (ai-find-dependencies package-name))
+    
+    ((_ "generate" name version source-url)
+     (print-banner)
+     (ai-generate-package-definition name version source-url))
+    
+    ((_ "health" package-name)
+     (print-banner)
+     (ai-analyze-package-health package-name))
+    
+    ((_ "updates")
+     (print-banner)
+     (ai-recommend-updates))
+    
+    ((_ "explain" log-file)
+     (print-banner)
+     (ai-explain-build-failure log-file))
+    
+    ((_ "interactive")
+     (print-banner)
+     (ai-assistant-repl))
+    
+    ((_ "help")
+     (print-help))
+    
+    ((_ "--help")
+     (print-help))
+    
+    ((_ "-h")
+     (print-help))
+    
+    (_
+     (print-banner)
+     (format #t "Invalid command. Try: guix ai help~%~%"))))
+
+;; Run the main function
+(main (command-line))
