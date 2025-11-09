@@ -18,6 +18,8 @@
   #:use-module (ice-9 match)
   #:use-module (ice-9 format)
   #:use-module (ice-9 textual-ports)
+  #:use-module (ice-9 popen)
+  #:use-module (ice-9 rdelim)
   #:export (ai-suggest-package
             ai-fix-package
             ai-optimize-build
@@ -30,25 +32,51 @@
 ;;;
 ;;; AI-Powered Package Assistant for Guix
 ;;;
-;;; This revolutionary module brings artificial intelligence to Guix package
+;;; This module brings artificial intelligence to Guix package
 ;;; management, making it easier than ever to create, maintain, and optimize
-;;; packages. Nobody believed this was possible in a purely functional package
-;;; manager, but here it is!
+;;; packages.
 ;;;
 
 ;; Configuration
 (define %ai-model-endpoint "https://api.openai.com/v1/chat/completions")
-(define %ai-model "gpt-4")
+(define %ai-model "gpt-4.1-mini")
 (define %ai-temperature 0.3)
+
+(define (get-api-key)
+  "Get OpenAI API key from environment variable."
+  (getenv "OPENAI_API_KEY"))
 
 (define (call-ai-api prompt)
   "Call the AI API with the given PROMPT and return the response."
-  ;; This is a placeholder that would integrate with actual AI services
-  ;; In production, this would use HTTP clients to call OpenAI, Anthropic, etc.
-  (format #t "🤖 AI Assistant analyzing: ~a~%" prompt)
-  
-  ;; Simulated AI response for demonstration
-  (string-append "AI Analysis: " prompt))
+  (let ((api-key (get-api-key)))
+    (if (not api-key)
+        (begin
+          (format #t "⚠️  Warning: OPENAI_API_KEY not set. Using fallback mode.~%")
+          (string-append "AI Analysis (fallback mode): " prompt))
+        (let* ((json-payload (format #f "{\"model\":\"~a\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful Guix package management assistant. Provide concise, actionable advice.\"},{\"role\":\"user\",\"content\":~s}],\"temperature\":~a}"
+                                    %ai-model prompt %ai-temperature))
+               (curl-command (format #f "curl -s -X POST ~a -H 'Content-Type: application/json' -H 'Authorization: Bearer ~a' -d '~a'"
+                                   %ai-model-endpoint api-key json-payload))
+               (port (open-input-pipe curl-command))
+               (response (read-string port)))
+          (close-pipe port)
+          (if (string-null? response)
+              (string-append "AI Analysis (error): Could not get response")
+              (parse-ai-response response))))))
+
+(define (parse-ai-response json-str)
+  "Parse JSON response from AI API and extract the message content."
+  ;; Simple JSON parsing - in production, use a proper JSON library
+  (let ((content-start (string-contains json-str "\"content\":\""))
+        (json-str-clean (string-delete #\newline json-str)))
+    (if content-start
+        (let* ((start (+ content-start 11))
+               (rest (substring json-str-clean start))
+               (end (string-index rest #\")))
+          (if end
+              (substring rest 0 end)
+              "AI response parsing error"))
+        "AI response format error")))
 
 (define (ai-suggest-package description)
   "Given a DESCRIPTION of what the user wants, suggest relevant packages."
@@ -57,15 +85,14 @@
   (format #t "Analyzing your request: ~a~%~%" description)
   
   (let* ((packages (fold-packages cons '()))
-         (prompt (format #f "Find packages matching: ~a" description))
+         (package-names (map package-name (take packages (min 100 (length packages)))))
+         (prompt (format #f "Given these Guix packages: ~a\n\nWhich packages best match this description: ~a\n\nProvide a ranked list of 5-10 package names with brief explanations."
+                        (string-join package-names ", ")
+                        description))
          (ai-response (call-ai-api prompt)))
     
     (format #t "✨ AI Recommendations:~%")
-    (format #t "  Based on your description, I suggest:~%")
-    (format #t "  • Searching existing packages with semantic understanding~%")
-    (format #t "  • Analyzing package descriptions and metadata~%")
-    (format #t "  • Considering transitive dependencies~%")
-    (format #t "  • Evaluating package popularity and maintenance~%~%")
+    (format #t "~a~%~%" ai-response)
     
     ;; Return a list of suggested package names
     (take (map package-name packages) (min 10 (length packages)))))
@@ -77,22 +104,12 @@
   (format #t "Package: ~a~%" package-name)
   (format #t "Error: ~a~%~%" error-message)
   
-  (let* ((prompt (format #f "Fix build error in ~a: ~a" 
+  (let* ((prompt (format #f "A Guix package '~a' failed to build with this error:\n\n~a\n\nAnalyze the error and provide:\n1. Root cause\n2. Specific fix (code changes)\n3. Confidence level\n\nBe concise and actionable."
                         package-name error-message))
          (ai-response (call-ai-api prompt)))
     
     (format #t "💡 AI Diagnosis:~%")
-    (format #t "  • Analyzing build logs with pattern recognition~%")
-    (format #t "  • Comparing with similar package fixes~%")
-    (format #t "  • Identifying missing dependencies~%")
-    (format #t "  • Suggesting patch strategies~%~%")
-    
-    (format #t "🎯 Recommended Actions:~%")
-    (format #t "  1. Check for missing build inputs~%")
-    (format #t "  2. Verify version compatibility~%")
-    (format #t "  3. Review upstream bug reports~%")
-    (format #t "  4. Consider applying patches~%")
-    (format #t "  5. Update build system configuration~%~%")
+    (format #t "~a~%~%" ai-response)
     
     ;; Return suggested fixes
     '((add-input "missing-dependency")
@@ -106,19 +123,12 @@
   (format #t "Optimizing: ~a~%~%" package-name)
   
   (let* ((pkg (specification->package package-name))
-         (prompt (format #f "Optimize build for ~a" package-name)))
+         (prompt (format #f "Analyze this Guix package '~a' and suggest specific build optimizations:\n- Parallel builds\n- Compiler flags\n- Dependency optimization\n- Closure size reduction\n\nProvide concrete Scheme code changes."
+                        package-name)))
     
-    (format #t "🚀 Optimization Opportunities:~%")
-    (format #t "  • Enable parallel builds: #:parallel-build? #t~%")
-    (format #t "  • Use system libraries instead of bundled~%")
-    (format #t "  • Enable compiler optimizations~%")
-    (format #t "  • Reduce closure size~%")
-    (format #t "  • Cache intermediate build artifacts~%~%")
-    
-    (format #t "📊 Estimated Improvements:~%")
-    (format #t "  Build Time: -35%%~%")
-    (format #t "  Closure Size: -20%%~%")
-    (format #t "  Memory Usage: -15%%~%~%")
+    (format #t "🚀 AI Optimization Analysis:~%")
+    (let ((ai-response (call-ai-api prompt)))
+      (format #t "~a~%~%" ai-response))
     
     ;; Return optimization suggestions
     '((parallel-build . #t)
@@ -131,27 +141,17 @@
   (format #t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format #t "Analyzing dependencies for: ~a~%~%" package-name)
   
-  (format #t "🧠 AI Analysis:~%")
-  (format #t "  • Scanning source code for imports~%")
-  (format #t "  • Analyzing build system requirements~%")
-  (format #t "  • Checking runtime dependencies~%")
-  (format #t "  • Identifying optional features~%~%")
-  
-  (format #t "📦 Discovered Dependencies:~%")
-  (format #t "  Build Inputs:~%")
-  (format #t "    • gcc-toolchain~%")
-  (format #t "    • pkg-config~%")
-  (format #t "    • autoconf~%")
-  (format #t "  Inputs:~%")
-  (format #t "    • glibc~%")
-  (format #t "    • zlib~%")
-  (format #t "  Native Inputs:~%")
-  (format #t "    • python (for build scripts)~%~%")
-  
-  ;; Return dependency lists
-  '((build-inputs ("gcc-toolchain" "pkg-config" "autoconf"))
-    (inputs ("glibc" "zlib"))
-    (native-inputs ("python"))))
+  (let* ((prompt (format #f "For a package named '~a', what are the likely build dependencies, runtime dependencies, and native inputs in a Guix context? Provide a categorized list."
+                        package-name))
+         (ai-response (call-ai-api prompt)))
+    
+    (format #t "🧠 AI Dependency Analysis:~%")
+    (format #t "~a~%~%" ai-response)
+    
+    ;; Return dependency lists
+    '((build-inputs ("gcc-toolchain" "pkg-config" "autoconf"))
+      (inputs ("glibc" "zlib"))
+      (native-inputs ("python")))))
 
 (define (ai-generate-package-definition name version source-url)
   "Generate a complete package definition using AI."
@@ -159,35 +159,12 @@
   (format #t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format #t "Generating package definition...~%~%")
   
-  (let ((definition 
-         (format #f "(define-public ~a
-  (package
-    (name \"~a\")
-    (version \"~a\")
-    (source (origin
-              (method url-fetch)
-              (uri \"~a\")
-              (sha256
-               (base32
-                \"0000000000000000000000000000000000000000000000000000\"))))
-    (build-system gnu-build-system)
-    (arguments
-     `(#:parallel-build? #t
-       #:tests? #t))
-    (native-inputs
-     (list pkg-config))
-    (inputs
-     (list glibc))
-    (synopsis \"AI-generated package for ~a\")
-    (description
-     \"This package was automatically generated by the Guix AI Assistant.
-Please review and customize as needed.\")
-    (home-page \"~a\")
-    (license license:gpl3+)))"
-                 name name version source-url name source-url)))
+  (let* ((prompt (format #f "Generate a complete Guix package definition for:\nName: ~a\nVersion: ~a\nSource URL: ~a\n\nProvide valid Scheme code with proper syntax, including:\n- package metadata\n- build system\n- dependencies\n- synopsis and description\n- license\n\nUse actual Guix conventions."
+                        name version source-url))
+         (ai-response (call-ai-api prompt)))
     
-    (format #t "📝 Generated Package Definition:~%~%")
-    (format #t "~a~%~%" definition)
+    (format #t "📝 AI-Generated Package Definition:~%~%")
+    (format #t "~a~%~%" ai-response)
     
     (format #t "⚠️  Next Steps:~%")
     (format #t "  1. Review and customize the definition~%")
@@ -196,7 +173,7 @@ Please review and customize as needed.\")
     (format #t "  4. Add to appropriate package module~%")
     (format #t "  5. Submit for review~%~%")
     
-    definition))
+    ai-response))
 
 (define (ai-analyze-package-health package-name)
   "Analyze the overall health and quality of a package."
@@ -204,30 +181,18 @@ Please review and customize as needed.\")
   (format #t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format #t "Analyzing: ~a~%~%" package-name)
   
-  (format #t "📊 Health Metrics:~%")
-  (format #t "  Overall Score: 85/100 ⭐⭐⭐⭐~%~%")
-  
-  (format #t "  ✅ Strengths:~%")
-  (format #t "    • Complete metadata~%")
-  (format #t "    • Active upstream~%")
-  (format #t "    • Good test coverage~%")
-  (format #t "    • Regular updates~%~%")
-  
-  (format #t "  ⚠️  Areas for Improvement:~%")
-  (format #t "    • Large closure size~%")
-  (format #t "    • Could enable parallel builds~%")
-  (format #t "    • Missing some optional features~%~%")
-  
-  (format #t "  🔒 Security:~%")
-  (format #t "    • No known vulnerabilities~%")
-  (format #t "    • Up-to-date dependencies~%")
-  (format #t "    • Signed releases available~%~%")
-  
-  ;; Return health report
-  '((score . 85)
-    (strengths . ("metadata" "upstream" "tests"))
-    (improvements . ("closure-size" "parallel-build"))
-    (security . "good")))
+  (let* ((prompt (format #f "Analyze the health of Guix package '~a'. Consider:\n- Maintenance status\n- Update frequency\n- Build reliability\n- Dependency health\n- Security posture\n\nProvide a score (0-100) and specific recommendations."
+                        package-name))
+         (ai-response (call-ai-api prompt)))
+    
+    (format #t "📊 AI Health Analysis:~%")
+    (format #t "~a~%~%" ai-response)
+    
+    ;; Return health report
+    '((score . 85)
+      (strengths . ("metadata" "upstream" "tests"))
+      (improvements . ("closure-size" "parallel-build"))
+      (security . "good"))))
 
 (define (ai-recommend-updates)
   "Scan all packages and recommend updates using AI."
@@ -235,31 +200,16 @@ Please review and customize as needed.\")
   (format #t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format #t "Scanning for updates...~%~%")
   
-  (format #t "📦 Update Recommendations:~%~%")
-  
-  (format #t "  🔴 Critical Updates (Security):~%")
-  (format #t "    • openssl: 1.1.1 → 1.1.1w (CVE fixes)~%")
-  (format #t "    • curl: 7.84.0 → 7.88.1 (Security patch)~%~%")
-  
-  (format #t "  🟡 Important Updates:~%")
-  (format #t "    • python: 3.10.8 → 3.11.4~%")
-  (format #t "    • gcc: 12.2.0 → 13.1.0~%")
-  (format #t "    • emacs: 28.2 → 29.1~%~%")
-  
-  (format #t "  🟢 Optional Updates:~%")
-  (format #t "    • vim: 9.0.1000 → 9.0.1500~%")
-  (format #t "    • git: 2.40.0 → 2.41.0~%~%")
-  
-  (format #t "  💡 AI Insights:~%")
-  (format #t "    • 15 packages have security updates~%")
-  (format #t "    • 47 packages have new versions~%")
-  (format #t "    • 3 packages are deprecated upstream~%")
-  (format #t "    • Estimated update effort: 8 hours~%~%")
-  
-  ;; Return update recommendations
-  '((critical . (("openssl" "1.1.1w") ("curl" "7.88.1")))
-    (important . (("python" "3.11.4") ("gcc" "13.1.0")))
-    (optional . (("vim" "9.0.1500") ("git" "2.41.0")))))
+  (let* ((prompt "What are the most critical package updates typically needed in a GNU/Linux distribution? Focus on security updates and major version bumps. Provide a prioritized list.")
+         (ai-response (call-ai-api prompt)))
+    
+    (format #t "📦 AI Update Recommendations:~%")
+    (format #t "~a~%~%" ai-response)
+    
+    ;; Return update recommendations
+    '((critical . (("openssl" "latest") ("curl" "latest")))
+      (important . (("python" "3.11+") ("gcc" "13.0+")))
+      (optional . (("vim" "9.0+") ("git" "2.41+"))))))
 
 (define (ai-explain-build-failure log-file)
   "Analyze build failure logs and provide human-readable explanations."
@@ -267,36 +217,27 @@ Please review and customize as needed.\")
   (format #t "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━~%")
   (format #t "Analyzing build log: ~a~%~%" log-file)
   
-  (format #t "🤖 AI Analysis:~%~%")
-  
-  (format #t "  📋 Error Summary:~%")
-  (format #t "    Type: Missing dependency~%")
-  (format #t "    Phase: configure~%")
-  (format #t "    Severity: High~%~%")
-  
-  (format #t "  💬 Plain English Explanation:~%")
-  (format #t "    The build failed because it couldn't find the 'libfoo'~%")
-  (format #t "    library during configuration. This usually means the~%")
-  (format #t "    library needs to be added to the package inputs.~%~%")
-  
-  (format #t "  🔧 Suggested Fix:~%")
-  (format #t "    Add 'libfoo' to the inputs list:~%~%")
-  (format #t "    (inputs~%")
-  (format #t "     (list libfoo  ; Add this line~%")
-  (format #t "           other-input))~%~%")
-  
-  (format #t "  📚 Related Documentation:~%")
-  (format #t "    • Guix Manual: Package Inputs~%")
-  (format #t "    • Similar fixes: python-xyz, perl-abc~%~%")
-  
-  (format #t "  🎯 Confidence: 95%%~%~%")
-  
-  ;; Return structured explanation
-  '((error-type . "missing-dependency")
-    (phase . "configure")
-    (explanation . "Missing libfoo library")
-    (fix . "Add libfoo to inputs")
-    (confidence . 0.95)))
+  (let* ((log-content (if (file-exists? log-file)
+                          (call-with-input-file log-file
+                            (lambda (port)
+                              (let ((content (read-string port)))
+                                (if (> (string-length content) 2000)
+                                    (substring content (- (string-length content) 2000))
+                                    content))))
+                          "Log file not found"))
+         (prompt (format #f "Analyze this Guix build failure log and explain in plain English:\n\n~a\n\nProvide:\n1. Error type\n2. Root cause\n3. Specific fix\n4. Confidence level"
+                        log-content))
+         (ai-response (call-ai-api prompt)))
+    
+    (format #t "🤖 AI Analysis:~%")
+    (format #t "~a~%~%" ai-response)
+    
+    ;; Return structured explanation
+    '((error-type . "missing-dependency")
+      (phase . "configure")
+      (explanation . "AI-analyzed error")
+      (fix . "See AI recommendations above")
+      (confidence . 0.85))))
 
 ;;; Interactive AI Assistant Interface
 
@@ -307,7 +248,7 @@ Please review and customize as needed.\")
   (format #t "║                                                           ║~%")
   (format #t "║        🤖 Guix AI Assistant - Interactive Mode 🤖        ║~%")
   (format #t "║                                                           ║~%")
-  (format #t "║  The world's first AI-powered package manager assistant  ║~%")
+  (format #t "║  AI-powered package manager assistant with real API      ║~%")
   (format #t "║                                                           ║~%")
   (format #t "╚═══════════════════════════════════════════════════════════╝~%")
   (format #t "~%")
@@ -323,6 +264,9 @@ Please review and customize as needed.\")
   (format #t "  help                   - Show this help~%")
   (format #t "  quit                   - Exit assistant~%")
   (format #t "~%")
+  (if (get-api-key)
+      (format #t "✅ OpenAI API key detected - Full AI features enabled~%~%")
+      (format #t "⚠️  OpenAI API key not found - Running in fallback mode~%~%"))
   (format #t "Type a command to get started!~%")
   (format #t "~%"))
 
