@@ -1,0 +1,6 @@
+# Keep directory structure but ignore some large files
+*.so
+*.a
+*.o
+__pycache__/
+*.pyc

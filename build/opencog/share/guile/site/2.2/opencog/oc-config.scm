@@ -1,0 +1,6 @@
+(define-module (opencog oc-config))
+(define-public opencog-ext-path-nlp-types "/gnu/store/n98zp95kw0hnnmgn680c0qqcyll12r07-opencog-0.1.4-1.ceac905/lib/opencog/")
+(define-public opencog-ext-path-nlp-fuzzy "/gnu/store/n98zp95kw0hnnmgn680c0qqcyll12r07-opencog-0.1.4-1.ceac905/lib/opencog/")
+(define-public opencog-ext-path-lg-dict "/gnu/store/n98zp95kw0hnnmgn680c0qqcyll12r07-opencog-0.1.4-1.ceac905/lib/opencog/")
+(define-public opencog-ext-path-lg-parse "/gnu/store/n98zp95kw0hnnmgn680c0qqcyll12r07-opencog-0.1.4-1.ceac905/lib/opencog/")
+(define-public opencog-ext-path-sureal "/gnu/store/n98zp95kw0hnnmgn680c0qqcyll12r07-opencog-0.1.4-1.ceac905/lib/opencog/")
