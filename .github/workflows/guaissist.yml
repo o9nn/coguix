@@ -1,4 +1,4 @@
-name: Install GNU Guix
+name: Install GNU Guix AI Assistant
 description: Add GNU guix package manager to GitHub Action runner.
 branding:
   icon: 'package'
@@ -94,6 +94,9 @@ runs:
     - run: sudo /var/guix/profiles/per-user/root/current-guix/bin/guix archive --generate-key
       shell: bash
       name: Generate keys
+    - run: sudo /var/guix/profiles/per-user/root/current-guix/bin/guix build -f guix-ai-assistant.scm
+      shell: bash
+      name: Build GUIX AI Assistant
     - run: |
         cat <<EOF > ${{ runner.temp }}/channels.scm
         ${{ inputs.channels }}
