@@ -1,0 +1,87 @@
+;;; GNU Guix --- Functional package management for GNU
+;;; Copyright © 2025 Manus AI <manus@optimizer.ai>
+;;;
+;;; This file is an example AGI-OS system configuration.
+;;;
+;;; You can adapt this file to configure a Guix System with AGI-OS
+;;; autonomous operating system capabilities.
+
+(use-modules (gnu)
+             (gnu system)
+             (gnu services)
+             (gnu services agi-os)
+             (gnu services networking)
+             (gnu services ssh)
+             (gnu packages opencog))
+
+(use-service-modules desktop networking ssh)
+(use-package-modules screen ssh)
+
+(operating-system
+  (host-name "agi-os")
+  (timezone "UTC")
+  (locale "en_US.utf8")
+
+  ;; Boot configuration
+  (bootloader (bootloader-configuration
+                (bootloader grub-bootloader)
+                (targets '("/dev/sda"))))
+
+  (file-systems (cons (file-system
+                        (device "/dev/sda1")
+                        (mount-point "/")
+                        (type "ext4"))
+                      %base-file-systems))
+
+  ;; Users
+  (users (cons (user-account
+                (name "admin")
+                (comment "AGI-OS Administrator")
+                (group "users")
+                (supplementary-groups '("wheel" "netdev"
+                                      "audio" "video"
+                                      "agi-os"))
+                (home-directory "/home/admin"))
+               %base-user-accounts))
+
+  ;; Global packages
+  (packages (cons* cogutil
+                   atomspace
+                   cogserver
+                   opencog
+                   screen
+                   openssh
+                   %base-packages))
+
+  ;; Services - The AGI-OS Engine!
+  (services
+   (cons* 
+    ;; AGI-OS Core Service
+    (service agi-os-service-type
+             (agi-os-configuration
+              (autonomous-mode? #t)
+              (learning-rate 0.15)
+              (optimization-level 'aggressive)
+              (cognitive-threshold 0.75)
+              (port 17001)))
+    
+    ;; Cognitive Monitor
+    (service cognitive-monitor-service-type
+             (cognitive-monitor-configuration
+              (interval 300)))  ; Check every 5 minutes
+    
+    ;; Autonomous Updater
+    (service autonomous-updater-service-type
+             (autonomous-updater-configuration
+              (schedule "0 3 * * *")  ; Daily at 3 AM
+              (threshold 0.8)))
+    
+    ;; Basic services
+    (service dhcp-client-service-type)
+    (service openssh-service-type
+             (openssh-configuration
+              (permit-root-login #f)
+              (password-authentication? #f)))
+    
+    ;; Base services
+    %base-services)))
